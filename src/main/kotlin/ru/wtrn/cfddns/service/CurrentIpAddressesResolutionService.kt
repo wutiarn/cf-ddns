@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import ru.wtrn.cfddns.model.IpAddressType
 import java.lang.Exception
 import java.util.UUID
 
@@ -17,13 +18,15 @@ class CurrentIpAddressesResolutionService {
     private val webClient = WebClient.builder()
         .build()
 
-    suspend fun getCurrentIpAddresses(): CurrentIpAddresses = withContext(Dispatchers.IO) {
-        val ipv4Address = async { getCurrentIpv4Address() }
-        val ipv6Address = async { getCurrentIpv6Address() }
-        return@withContext CurrentIpAddresses(
-            ipv4 = ipv4Address.await(),
-            ipv6 = ipv6Address.await()
-        )
+    suspend fun getCurrentIpAddresses(): Map<IpAddressType, String> = withContext(Dispatchers.IO) {
+        listOf(
+            IpAddressType.IPv4 to async { getCurrentIpv4Address() },
+            IpAddressType.IPv6 to async { getCurrentIpv6Address() }
+        ).mapNotNull { (addrType, deferred) ->
+            deferred.await()?.let {
+                addrType to it
+            }
+        }.toMap()
     }
 
     private suspend fun getCurrentIpv4Address(): String? {
@@ -56,9 +59,4 @@ class CurrentIpAddressesResolutionService {
             return@withContext result
         }
     }
-
-    data class CurrentIpAddresses(
-        val ipv4: String?,
-        val ipv6: String?
-    )
 }
