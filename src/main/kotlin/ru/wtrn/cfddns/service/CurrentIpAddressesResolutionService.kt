@@ -3,11 +3,14 @@ package ru.wtrn.cfddns.service
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.reactive.awaitFirstOrNull
+import kotlinx.coroutines.slf4j.MDCContext
+import kotlinx.coroutines.slf4j.MDCContextMap
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import reactor.core.publisher.Mono
+import java.util.UUID
 
 @Service
 class CurrentIpAddressesResolutionService {
@@ -25,26 +28,35 @@ class CurrentIpAddressesResolutionService {
     }
 
     private suspend fun getCurrentIpv4Address(): String? {
-        return callIpfy("https://api.ipify.org")
+        return callEndpoint("http://ipv4bot.whatismyipaddress.com")
     }
 
     private suspend fun getCurrentIpv6Address(): String? {
-        return callIpfy("https://api6.ipify.org")
+        return callEndpoint("http://ipv6bot.whatismyipaddress.com")
     }
 
-    private suspend fun callIpfy(url: String): String? {
-        return webClient.get()
-            .uri(url)
-            .retrieve()
-            .bodyToMono(String::class.java)
-            .onErrorResume { e ->
-                logger.debug(e) { "Failed to get $url. Returning null instead" }
-                Mono.empty<String>()
-            }
-            .doOnNext {
-                logger.info { "GET $url returned $it" }
-            }
-            .awaitFirstOrNull()
+    private suspend fun callEndpoint(url: String): String? {
+        val mdcContext = MDCContext(
+            mapOf(
+                "requestId" to UUID.randomUUID().toString()
+            )
+        )
+        return withContext(mdcContext) {
+            logger.info { "Starting request to $url" }
+            webClient.get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(String::class.java)
+                .onErrorResume { e ->
+                    logger.debug(e) { "Failed to get $url. Returning null instead" }
+                    Mono.empty<String>()
+                }
+                .doOnNext {
+                    logger.info { "GET $url returned $it" }
+                }
+                .awaitFirstOrNull()
+        }
+
     }
 
     data class CurrentIpAddresses(
