@@ -10,7 +10,6 @@ import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import ru.wtrn.cfddns.model.IpAddressType
-import java.lang.Exception
 import java.util.UUID
 
 @Service

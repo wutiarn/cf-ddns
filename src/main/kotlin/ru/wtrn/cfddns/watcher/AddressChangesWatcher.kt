@@ -14,7 +14,6 @@ import ru.wtrn.cfddns.configuration.propeties.WatcherProperties
 import ru.wtrn.cfddns.model.IpAddressType
 import ru.wtrn.cfddns.service.CloudflareService
 import ru.wtrn.cfddns.service.CurrentIpAddressesResolutionService
-import java.time.Duration
 import java.time.Instant
 import javax.annotation.PostConstruct
 

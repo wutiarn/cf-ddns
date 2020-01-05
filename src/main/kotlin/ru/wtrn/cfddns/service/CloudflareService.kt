@@ -1,13 +1,11 @@
 package ru.wtrn.cfddns.service
 
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
@@ -34,16 +32,13 @@ class CloudflareService(
     ): Map<IpAddressType, CloudFlareRecordUpdateResult> = withContext(Dispatchers.IO) {
         val currentRecords = getZoneRecords()
 
-        newAddresses.map { (addrType, newAddress) ->
+        val deferredResults = newAddresses.map { (addrType, newAddress) ->
             val record = currentRecords.recordsByType[addrType] ?: let {
                 logger.warn { "Failed to find ${addrType.zoneType} record for configured subdomain. Skipping $addrType patch." }
                 return@map addrType to CompletableDeferred(CloudFlareRecordUpdateResult.RECORD_NOT_FOUND)
             }
 
             if (record.content == newAddress) {
-                logger.debug {
-                    "${addrType.zoneType} already up to date"
-                }
                 return@map addrType to CompletableDeferred(CloudFlareRecordUpdateResult.UP_TO_DATE)
             }
 
@@ -51,14 +46,16 @@ class CloudflareService(
                 patchRecordContent(zoneId = currentRecords.zoneId, recordId = record.id, newContent = newAddress)
                 CloudFlareRecordUpdateResult.UPDATED
             }
-        }.associate { (addrType, job) ->
+        }
+
+        deferredResults.associate { (addrType, job) ->
             val result = try {
                 job.await()
             } catch (e: Exception) {
                 logger.warn(e) { "Failed to update ${addrType.zoneType} record" }
                 CloudFlareRecordUpdateResult.FAILED
             }
-            logger.debug { "${addrType.zoneType} processed: $result" }
+            logger.debug { "${addrType.zoneType} record processed: $result" }
             addrType to result
         }
     }
