@@ -1,3 +1,3 @@
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID}){magenta} --- [%15.15t] %clr(%-40.40logger{39}){cyan} : %m {%mdc} %n%wEx"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID}){magenta} --- [%15.15t] %clr(%-40.40logger{39}){cyan} : %m %clr({%mdc}){magenta} %n%wEx"
