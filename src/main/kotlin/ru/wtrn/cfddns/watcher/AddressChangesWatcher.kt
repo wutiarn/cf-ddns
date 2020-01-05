@@ -15,6 +15,7 @@ import ru.wtrn.cfddns.model.IpAddressType
 import ru.wtrn.cfddns.service.CloudflareService
 import ru.wtrn.cfddns.service.CurrentIpAddressesResolutionService
 import java.time.Instant
+import java.util.UUID
 import javax.annotation.PostConstruct
 
 @Component
@@ -25,29 +26,38 @@ class AddressChangesWatcher(
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private var reportedAddresses: Map<IpAddressType, String>? = null
+    var reportedAddresses: Map<IpAddressType, String>? = null
 
     @PostConstruct
     fun setup() {
+        if (!watcherProperties.enabled) {
+            logger.warn { "AddressChangesWatcher disabled in properties" }
+            return
+        }
+        @Suppress("DeferredResultUnused")
         GlobalScope.async(Dispatchers.IO) {
             logger.info { "AddressChangesWatcher started with interval ${watcherProperties.interval}" }
             while (true) {
-                MDC.put("startTime", Instant.now().toString())
-                withContext(MDCContext()) {
-                    try {
-                        withTimeout(watcherProperties.timeout.toMillis()) {
-                            checkForAddressChanges()
-                        }
-                    } catch (e: Exception) {
-                        logger.warn { "Exception occurred in ip address changes watcher" }
-                    }
+                try {
+                    checkForAddressChanges()
+                } catch (e: Exception) {
+                    logger.warn(e) { "Exception occurred in ip address changes watcher" }
                 }
                 delay(watcherProperties.interval.toMillis())
             }
         }
     }
 
-    suspend fun checkForAddressChanges() {
+    private suspend fun checkForAddressChanges() {
+        MDC.put("watcherCycleId", UUID.randomUUID().toString())
+        withContext(MDCContext()) {
+            withTimeout(watcherProperties.timeout.toMillis()) {
+                doCheckForAddressChanges()
+            }
+        }
+    }
+
+    private suspend fun doCheckForAddressChanges() {
         logger.debug { "Checking for address changes" }
         val currentAddresses = currentIpAddressesResolutionService.getCurrentIpAddresses()
         if (currentAddresses != reportedAddresses) {

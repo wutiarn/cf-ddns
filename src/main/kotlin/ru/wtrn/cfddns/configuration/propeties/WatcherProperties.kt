@@ -8,5 +8,6 @@ import java.time.Duration
 @ConfigurationProperties("cf-ddns.watcher")
 data class WatcherProperties(
     val interval: Duration = Duration.ofMinutes(5),
-    val timeout: Duration = Duration.ofSeconds(30)
+    val timeout: Duration = Duration.ofSeconds(30),
+    val enabled: Boolean = true
 )
