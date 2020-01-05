@@ -6,6 +6,7 @@ import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
+import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import ru.wtrn.cfddns.model.IpAddressType
@@ -38,13 +39,9 @@ class CurrentIpAddressesResolutionService {
     }
 
     private suspend fun callEndpoint(url: String): String? {
-        val mdcContext = MDCContext(
-            mapOf(
-                "requestId" to UUID.randomUUID().toString()
-            )
-        )
-        return withContext(mdcContext) {
-            logger.info { "Starting request to $url" }
+        MDC.put("requestId", UUID.randomUUID().toString())
+        return withContext(MDCContext()) {
+            logger.debug { "Starting request to $url" }
             val result = try {
                 webClient.get()
                     .uri(url)
@@ -55,7 +52,7 @@ class CurrentIpAddressesResolutionService {
                 logger.debug(e) { "Failed to get $url. Returning null instead" }
                 null
             }
-            logger.info { "GET $url returned $result" }
+            logger.debug { "GET $url returned $result" }
             return@withContext result
         }
     }

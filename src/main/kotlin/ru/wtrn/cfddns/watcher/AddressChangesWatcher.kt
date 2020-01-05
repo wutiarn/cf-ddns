@@ -8,6 +8,7 @@ import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import mu.KotlinLogging
+import org.slf4j.MDC
 import org.springframework.stereotype.Component
 import ru.wtrn.cfddns.configuration.propeties.WatcherProperties
 import ru.wtrn.cfddns.model.IpAddressType
@@ -30,9 +31,10 @@ class AddressChangesWatcher(
     @PostConstruct
     fun setup() {
         GlobalScope.async(Dispatchers.IO) {
+            logger.info { "AddressChangesWatcher started with interval ${watcherProperties.interval}" }
             while (true) {
-                val mdcContextMap = mapOf("startTime" to Instant.now().toString())
-                withContext(MDCContext(mdcContextMap)) {
+                MDC.put("startTime", Instant.now().toString())
+                withContext(MDCContext()) {
                     try {
                         withTimeout(watcherProperties.timeout.toMillis()) {
                             checkForAddressChanges()
@@ -41,22 +43,23 @@ class AddressChangesWatcher(
                         logger.warn { "Exception occurred in ip address changes watcher" }
                     }
                 }
-                delay(Duration.ofMinutes(1).toMillis())
+                delay(watcherProperties.interval.toMillis())
             }
         }
     }
 
     suspend fun checkForAddressChanges() {
+        logger.debug { "Checking for address changes" }
         val currentAddresses = currentIpAddressesResolutionService.getCurrentIpAddresses()
         if (currentAddresses != reportedAddresses) {
             logger.info {
                 val types = currentAddresses.keys + (reportedAddresses?.keys ?: emptySet())
-                val details = types.map { "$it: ${reportedAddresses?.get(it)} -> ${currentAddresses[it]}" }.joinToString()
+                val details = types.joinToString { "$it: ${reportedAddresses?.get(it)} -> ${currentAddresses[it]}" }
                 "Address change detected. $details."
             }
+            cloudflareService.patchRecordAddress(currentAddresses)
+            reportedAddresses = currentAddresses
+            logger.info { "Cloudflare records successfully updated" }
         }
-        cloudflareService.patchRecordAddress(currentAddresses)
-        reportedAddresses = currentAddresses
-        logger.info { "Successfully reported current addresses" }
     }
 }

@@ -37,10 +37,8 @@ class CloudflareService(
             }
 
             if (record.content == newAddress) {
-                logger.warn {
-                    "Skipping $addrType update: CloudFlare already has new address. Note, that " +
-                            "CloudFlareService.patchRecordAddress should be invoked only on actual address changes to minimize " +
-                            "amount of requests to CloudFlare API."
+                logger.debug {
+                    "${addrType.zoneType} already up to date"
                 }
                 return@mapNotNull null
             }
@@ -51,8 +49,9 @@ class CloudflareService(
         }.forEach { (addrType, job) ->
             try {
                 job.await()
+                logger.debug { "${addrType.zoneType} record successfully updated" }
             } catch (e: Exception) {
-                logger.warn(e) { "Failed to update $addrType record" }
+                logger.warn(e) { "Failed to update ${addrType.zoneType} record" }
             }
         }
     }
