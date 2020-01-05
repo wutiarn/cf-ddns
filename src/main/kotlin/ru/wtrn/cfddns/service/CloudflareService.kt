@@ -1,5 +1,7 @@
 package ru.wtrn.cfddns.service
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.reactive.awaitFirst
@@ -27,32 +29,37 @@ class CloudflareService(
         .defaultHeader("X-Auth-Key", properties.authKey)
         .build()
 
-    suspend fun patchRecordAddress(newAddresses: Map<IpAddressType, String>) = withContext(Dispatchers.IO) {
+    suspend fun patchRecordAddress(
+        newAddresses: Map<IpAddressType, String>
+    ): Map<IpAddressType, CloudFlareRecordUpdateResult> = withContext(Dispatchers.IO) {
         val currentRecords = getZoneRecords()
 
-        newAddresses.mapNotNull { (addrType, newAddress) ->
+        newAddresses.map { (addrType, newAddress) ->
             val record = currentRecords.recordsByType[addrType] ?: let {
                 logger.warn { "Failed to find ${addrType.zoneType} record for configured subdomain. Skipping $addrType patch." }
-                return@mapNotNull null
+                return@map addrType to CompletableDeferred(CloudFlareRecordUpdateResult.RECORD_NOT_FOUND)
             }
 
             if (record.content == newAddress) {
                 logger.debug {
                     "${addrType.zoneType} already up to date"
                 }
-                return@mapNotNull null
+                return@map addrType to CompletableDeferred(CloudFlareRecordUpdateResult.UP_TO_DATE)
             }
 
             addrType to async {
                 patchRecordContent(zoneId = currentRecords.zoneId, recordId = record.id, newContent = newAddress)
+                CloudFlareRecordUpdateResult.UPDATED
             }
-        }.forEach { (addrType, job) ->
-            try {
+        }.associate { (addrType, job) ->
+            val result = try {
                 job.await()
-                logger.debug { "${addrType.zoneType} record successfully updated" }
             } catch (e: Exception) {
                 logger.warn(e) { "Failed to update ${addrType.zoneType} record" }
+                CloudFlareRecordUpdateResult.FAILED
             }
+            logger.debug { "${addrType.zoneType} processed: $result" }
+            addrType to result
         }
     }
 
@@ -115,4 +122,11 @@ class CloudflareService(
         val zoneId: String,
         val recordsByType: Map<IpAddressType, CloudFlareZoneRecord>
     )
+
+    enum class CloudFlareRecordUpdateResult {
+        UPDATED,
+        UP_TO_DATE,
+        RECORD_NOT_FOUND,
+        FAILED
+    }
 }

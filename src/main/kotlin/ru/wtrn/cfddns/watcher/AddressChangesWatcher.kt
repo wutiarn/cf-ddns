@@ -57,9 +57,12 @@ class AddressChangesWatcher(
                 val details = types.joinToString { "$it: ${reportedAddresses?.get(it)} -> ${currentAddresses[it]}" }
                 "Address change detected. $details."
             }
-            cloudflareService.patchRecordAddress(currentAddresses)
+            val result = cloudflareService.patchRecordAddress(currentAddresses)
             reportedAddresses = currentAddresses
-            logger.info { "Cloudflare records successfully updated" }
+            logger.info {
+                val details = result.entries.joinToString { "${it.key} ${it.value}" }
+                "Cloudflare response: $details"
+            }
         }
     }
 }
