@@ -13,11 +13,11 @@ class StatusController(
 ) {
     @GetMapping("status")
     suspend fun status(): StatusResponse {
-        val cloudflareZoneRecordSpec = cloudflareService.getZoneRecordSpec()
+        val zoneRecords = cloudflareService.getZoneRecords()
         val currentIpAddresses = currentIpAddressesResolutionService.getCurrentIpAddresses()
         return StatusResponse(
             currentIpAddresses = currentIpAddresses,
-            cloudflareZoneRecords = cloudflareZoneRecordSpec
+            cloudflareZoneRecords = zoneRecords
         )
     }
 }
