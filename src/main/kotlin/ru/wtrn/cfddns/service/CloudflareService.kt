@@ -1,10 +1,12 @@
 package ru.wtrn.cfddns.service
 
-import com.fasterxml.jackson.databind.JsonNode
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
 import ru.wtrn.cfddns.configuration.propeties.CloudflareProperties
+import ru.wtrn.cfddns.dto.cloudflare.CloudFlareResponse
+import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZone
+import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZoneRecord
 
 @Service
 class CloudflareService(
@@ -16,34 +18,40 @@ class CloudflareService(
         .defaultHeader("X-Auth-Key", properties.authKey)
         .build()
 
-    private var cachedZoneRecordSpec: ZoneRecordSpec? = null
-
-    suspend fun getZoneRecordSpec(): ZoneRecordSpec {
-        return cachedZoneRecordSpec ?: queryZoneRecordSpec().also {
-            cachedZoneRecordSpec = it
-        }
-    }
-
-    private suspend fun queryZoneRecordSpec(): ZoneRecordSpec {
-        val zoneListResponse = webClient.get()
-                .uri("zones")
-                .attribute("name", properties.zoneName)
-                .retrieve()
-                .awaitBody<JsonNode>()
-        val zoneId = zoneListResponse.path("result")
-            .path(0)
-            .path("id")
-            .textValue() ?: throw IllegalStateException("Failed to retrieve zoneId from response $zoneListResponse")
-
-        val recordsResponse = webClient.get()
-            .uri("zones/$zoneId/dns_records")
+    private suspend fun getZoneRecords(): ZoneRecords {
+        val zoneId = webClient.get()
+            .uri {
+                it.path("zones")
+                    .queryParam("name", properties.zoneName)
+                    .build()
+            }
             .attribute("name", properties.zoneName)
             .retrieve()
-            .awaitBody<JsonNode>()
+            .awaitBody<CloudFlareResponse<List<CloudFlareZone>>>()
+            .result
+            .firstOrNull()
+            ?.id ?: throw IllegalStateException("Cannot find requested zone id")
+
+        val recordsByType = webClient.get()
+            .uri {
+                it.path("zones/{zoneId}/dns_records")
+                    .queryParam("name", "${properties.subdomain}.${properties.zoneName}")
+                    .build(zoneId)
+            }
+            .attribute("name", "${properties.subdomain}.${properties.zoneName}")
+            .retrieve()
+            .awaitBody<CloudFlareResponse<List<CloudFlareZoneRecord>>>()
+            .result
+            .associateBy { it.type }
+
+        return ZoneRecords(
+            zoneId = zoneId,
+            recordsByType = recordsByType
+        )
     }
 
-    data class ZoneRecordSpec(
+    data class ZoneRecords(
         val zoneId: String,
-        val recordId: String
+        val recordsByType: Map<String, CloudFlareZoneRecord>
     )
 }
