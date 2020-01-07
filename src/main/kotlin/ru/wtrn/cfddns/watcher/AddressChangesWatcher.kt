@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import mu.KotlinLogging
 import org.slf4j.MDC
+import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.stereotype.Component
 import ru.wtrn.cfddns.configuration.propeties.WatcherProperties
 import ru.wtrn.cfddns.model.IpAddressType
@@ -22,7 +23,8 @@ import javax.annotation.PostConstruct
 class AddressChangesWatcher(
     private val watcherProperties: WatcherProperties,
     private val currentIpAddressesResolutionService: CurrentIpAddressesResolutionService,
-    private val cloudflareService: CloudflareService
+    private val cloudflareService: CloudflareService,
+    private val configurableApplicationContext: ConfigurableApplicationContext
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -41,7 +43,8 @@ class AddressChangesWatcher(
                 try {
                     checkForAddressChanges()
                 } catch (e: Exception) {
-                    logger.warn(e) { "Exception occurred in ip address changes watcher" }
+                    logger.warn(e) { "Potentially non-recoverable exception occurred in ip address changes watcher. Terminating." }
+                    configurableApplicationContext.close()
                 }
                 delay(watcherProperties.interval.toMillis())
             }
