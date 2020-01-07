@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.ConstructorBinding
 
 @ConstructorBinding
-@ConfigurationProperties("cf-ddns")
+@ConfigurationProperties("cf-ddns.cloudflare")
 data class CloudflareProperties(
     val email: String,
     val authKey: String,
