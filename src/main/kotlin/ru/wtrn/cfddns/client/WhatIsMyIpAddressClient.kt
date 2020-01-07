@@ -1,24 +1,14 @@
 package ru.wtrn.cfddns.client
 
-import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.awaitFirstOrNull
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import org.slf4j.MDC
+import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.ClientResponse
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBody
-import org.springframework.web.reactive.function.client.bodyToMono
-import reactor.core.publisher.Mono
-import ru.wtrn.cfddns.configuration.propeties.CloudflareProperties
 import ru.wtrn.cfddns.configuration.propeties.IpResolutionProperties
-import ru.wtrn.cfddns.dto.cloudflare.CloudFlareErrorResponse
-import ru.wtrn.cfddns.dto.cloudflare.CloudFlareResponse
-import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZone
-import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZoneRecord
 import ru.wtrn.cfddns.model.IpAddressType
 import java.util.UUID
 
@@ -29,6 +19,7 @@ class WhatIsMyIpAddressClient(
     private val logger = KotlinLogging.logger { }
 
     private val webClient = WebClient.builder()
+        .defaultHeader(HttpHeaders.USER_AGENT, "WTRN ClodFlare DDNS Agent (+${ipResolutionProperties.contactEmail})")
         .build()
 
     suspend fun getCurrentIpv4Address(): String? {
@@ -39,7 +30,15 @@ class WhatIsMyIpAddressClient(
         return callEndpoint("https://ipv6bot.whatismyipaddress.com")
     }
 
-    private suspend fun callEndpoint(url: String): String? {
+    private suspend fun callEndpoint(
+        url: String,
+        addressType: IpAddressType,
+        properties: IpResolutionProperties.VersionSpecificResolutionProperties
+    ): String? {
+        if (!properties.active) {
+            logger.debug { "Skipping request to $url: $addressType resolution disabled" }
+            return null
+        }
         MDC.put("requestId", UUID.randomUUID().toString())
         return withContext(MDCContext()) {
             logger.debug { "Starting request to $url" }
@@ -50,11 +49,17 @@ class WhatIsMyIpAddressClient(
                     .bodyToMono(String::class.java)
                     .timeout(ipResolutionProperties.timeout)
                     .awaitFirstOrNull()
+                    .also {
+                        logger.debug { "GET $url returned $it" }
+                    }
             } catch (e: Exception) {
-                logger.debug(e) { "Failed to get $url. Returning null instead" }
+                val msg = { "Failed to get $url. Returning null instead" }
+                when(properties.warnOnFailure) {
+                    true -> logger.warn(e, msg)
+                    false -> logger.debug(e, msg)
+                }
                 null
             }
-            logger.debug { "GET $url returned $result" }
             return@withContext result
         }
     }

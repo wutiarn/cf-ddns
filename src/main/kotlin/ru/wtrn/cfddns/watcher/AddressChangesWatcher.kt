@@ -63,7 +63,8 @@ class AddressChangesWatcher(
     private suspend fun doCheckForAddressChanges() {
         logger.debug { "Checking for address changes" }
         val currentAddresses = currentIpAddressesResolutionService.getCurrentIpAddresses()
-        if (currentAddresses != reportedAddresses) {
+
+        if (currentAddresses.isNotEmpty() && currentAddresses != reportedAddresses) {
             logger.info {
                 val types = currentAddresses.keys + (reportedAddresses?.keys ?: emptySet())
                 val details = types.joinToString { "$it: ${reportedAddresses?.get(it)} -> ${currentAddresses[it]}" }
