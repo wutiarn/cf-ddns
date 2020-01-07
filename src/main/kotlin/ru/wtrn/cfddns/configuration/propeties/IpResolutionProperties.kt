@@ -15,7 +15,9 @@ data class IpResolutionProperties(
      * to support Spring Boot Configuration Annotation Processor
      */
     val ipv4: VersionSpecificResolutionProperties = VersionSpecificResolutionProperties(),
-    val ipv6: VersionSpecificResolutionProperties = VersionSpecificResolutionProperties()
+    val ipv6: VersionSpecificResolutionProperties = VersionSpecificResolutionProperties(
+        active = false
+    )
 ) {
     data class VersionSpecificResolutionProperties(
         val active: Boolean = true,
