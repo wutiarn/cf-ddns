@@ -35,6 +35,10 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.withType<Jar> {
+    archiveFileName.set("cf-ddns.jar")
+}
+
 tasks.withType<KotlinCompile> {
     kotlinOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
