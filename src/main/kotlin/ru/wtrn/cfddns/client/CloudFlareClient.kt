@@ -2,9 +2,14 @@ package ru.wtrn.cfddns.client
 
 import kotlinx.coroutines.reactive.awaitFirst
 import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.ClientResponse
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
+import org.springframework.web.reactive.function.client.bodyToMono
+import reactor.core.publisher.Mono
 import ru.wtrn.cfddns.configuration.propeties.CloudflareProperties
+import ru.wtrn.cfddns.dto.cloudflare.CloudFlareErrorResponse
 import ru.wtrn.cfddns.dto.cloudflare.CloudFlareResponse
 import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZone
 import ru.wtrn.cfddns.dto.cloudflare.CloudFlareZoneRecord
@@ -18,6 +23,7 @@ class CloudFlareClient(
         .baseUrl("https://api.cloudflare.com/client/v4/")
         .defaultHeader("X-Auth-Email", properties.email)
         .defaultHeader("X-Auth-Key", properties.authKey)
+        .filter(responseErrorFilter)
         .build()
 
     suspend fun findZoneIdByZoneName(zoneName: String): String {
@@ -59,5 +65,23 @@ class CloudFlareClient(
             )
             .exchange()
             .awaitFirst()
+    }
+
+    companion object {
+        private val responseErrorFilter = ExchangeFilterFunction.ofResponseProcessor { response ->
+            when (response.statusCode().isError) {
+                false -> Mono.just(response)
+                true -> {
+                    response.bodyToMono<CloudFlareErrorResponse>()
+                        .flatMap { errorResponse ->
+                            Mono.error<ClientResponse>(
+                                IllegalStateException(
+                                    "Received error response from CloudFlare. Errors: ${errorResponse.errors}"
+                                )
+                            )
+                        }
+                }
+            }
+        }
     }
 }
