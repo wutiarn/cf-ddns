@@ -1,8 +1,8 @@
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %clr(%5p) %clr(${PID}){magenta} --- [%15.15t] %clr(%-40.40logger{39}){cyan} : %m %clr(%mdc){magenta} %n%wEx"
-cf-ddns:
-  email: TODO
-  auth-key: TODO
-  subdomain: hs
-  zone-name: wtrn.ru
+#cf-ddns:
+#  email: TODO (e.g. example@gmail.com)
+#  auth-key: TODO (e.g. 19cdcf82c63d62c9f038a180e29f342bc3d3e)
+#  subdomain: TODO (e.g. hs)
+#  zone-name: TODO (e.g. wtrn.ru)
