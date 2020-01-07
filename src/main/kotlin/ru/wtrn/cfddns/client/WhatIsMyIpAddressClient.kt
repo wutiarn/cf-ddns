@@ -23,11 +23,11 @@ class WhatIsMyIpAddressClient(
         .build()
 
     suspend fun getCurrentIpv4Address(): String? {
-        return callEndpoint("https://ipv4bot.whatismyipaddress.com")
+        return callEndpoint("https://ipv4bot.whatismyipaddress.com", IpAddressType.IPv4, ipResolutionProperties.ipv4)
     }
 
     suspend fun getCurrentIpv6Address(): String? {
-        return callEndpoint("https://ipv6bot.whatismyipaddress.com")
+        return callEndpoint("https://ipv6bot.whatismyipaddress.com", IpAddressType.IPv6, ipResolutionProperties.ipv6)
     }
 
     private suspend fun callEndpoint(
